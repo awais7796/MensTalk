@@ -1,5 +1,11 @@
 @import "tailwindcss";
+:root {
+  --bg-gradient: linear-gradient(to bottom right, #1a1412, #0f0e0d, #2b211d);
+}
+
 body {
   margin: 0;
   padding: 0;
+  background: var(--bg-gradient);
+  color: #e8dcc4;
 }
