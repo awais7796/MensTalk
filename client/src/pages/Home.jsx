@@ -1,10 +1,8 @@
-import Button from "../components/ui/Button";
 import React from "react";
-
 const Home = () => {
   return (
     <>
-      <div className="h-screen w-full flex flex-col justify-center items-center text-[#E8DCC4] px-4 text-center ">
+      <div className="flex-1 w-full flex flex-col justify-center items-center text-[#E8DCC4] px-4 text-center ">
         <h1 className="text-[#aa8247] text-6xl font-bold tracking-wide mb-4">
           MansTalk
         </h1>
