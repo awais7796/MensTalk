@@ -1,30 +1,17 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
+import { useChat } from "../Hooks/useChat";
+import ChatBubble from "../components/ui/ChatBubble";
+import ChatInput from "../components/ui/ChatInput";
 
 const Chat = () => {
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState([]);
+  const { messages, sendMessage, isLoading } = useChat();
+  const [inputValue, setInputValue] = useState("");
 
-  // Ref for auto-scroll
-  const chatEndRef = useRef(null);
-
-  // Scroll to bottom whenever messages update
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleSend = () => {
-    if (message.trim()) {
-      setMessages((prev) => [...prev, { text: message, sender: "user" }]);
-      setMessage("");
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") handleSend();
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return;
+    const text = inputValue.trim();
+    setInputValue("");
+    await sendMessage(text);
   };
 
   return (
@@ -37,9 +24,8 @@ const Chat = () => {
       </div>
 
       {/* CHAT AREA */}
-      <div className="bg-red-800 flex-1 overflow-y-auto px-4 py-6 flex justify-center">
-        <div className="bg-green-900 w-full max-w-2xl space-y-4">
-          {/* Welcome area (only if 0 messages) */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 flex justify-center">
+        <div className="w-full max-w-2xl space-y-4">
           {messages.length === 0 && (
             <div className="text-center mt-20">
               <h2 className="text-3xl font-bold text-[#aa8247] mb-2">
@@ -51,56 +37,40 @@ const Chat = () => {
             </div>
           )}
 
-          {/* Messages */}
           {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`px-4 py-3 rounded-2xl max-w-xs shadow-md
-                ${
-                  msg.sender === "user"
-                    ? "bg-[#aa8247] text-black rounded-br-none"
-                    : "bg-[#1c1714] text-[#E8DCC4] rounded-bl-none"
-                }`}
-              >
-                {msg.text}
-              </div>
-            </div>
+            <ChatBubble key={idx} msg={msg} />
           ))}
 
-          {/* Auto-scroll anchor */}
-          <div ref={chatEndRef} />
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-[#2b241f] px-4 py-3 rounded-xl">
+                <div className="flex gap-1">
+                  <div
+                    className="w-2 h-2 bg-[#aa8247] rounded-full animate-bounce"
+                    style={{ animationDelay: "0ms" }}
+                  ></div>
+                  <div
+                    className="w-2 h-2 bg-[#aa8247] rounded-full animate-bounce"
+                    style={{ animationDelay: "150ms" }}
+                  ></div>
+                  <div
+                    className="w-2 h-2 bg-[#aa8247] rounded-full animate-bounce"
+                    style={{ animationDelay: "300ms" }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* INPUT AREA */}
-      <div className="border-t border-[#2b211d] bg-[#1a1412] p-4">
-        <div className="max-w-2xl mx-auto flex gap-3">
-          <input
-            type="text"
-            value={message}
-            //getting input of users form here
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type your message..."
-            className="flex-1 px-4 py-3 bg-[#2b241f] text-[#E8DCC4] placeholder-[#AFA48D]
-                       border border-[#3a2f28] rounded-xl
-                       focus:outline-none focus:ring-2 focus:ring-[#aa8247]"
-          />
-
-          <button
-            onClick={handleSend}
-            className="bg-[#aa8247] hover:bg-[#8f6c3c] transition px-6 py-3 
-                       rounded-xl font-semibold text-black shadow-[0_4px_15px_rgba(170,130,71,0.4)]"
-          >
-            Send
-          </button>
-        </div>
-      </div>
+      <ChatInput
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onSend={handleSend}
+        disabled={isLoading}
+      />
     </div>
   );
 };
