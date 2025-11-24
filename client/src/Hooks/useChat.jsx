@@ -1,72 +1,110 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-/**
- * useChat - simple hook to manage messages and send user prompts to a backend
- * that proxies requests to Gemini (do NOT call Google APIs directly from the client).
- *
- * Usage:
- * const { messages, sendMessage, isLoading, error } = useChat();
- * sendMessage("Hello");
- */
-export default function useChat({ endpoint = "/api/gemini" } = {}) {
-  const [messages, setMessages] = useState([]); // { id, sender: 'user'|'bot', text }
+export const useChat = () => {
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem("menstalk-messages");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  const sendMessage = useCallback(
-    async (text) => {
-      const trimmed = text?.trim();
-      if (!trimmed) return;
+  // Save messages in localStorage for persistence
+  useEffect(() => {
+    localStorage.setItem("menstalk-messages", JSON.stringify(messages));
+  }, [messages]);
 
-      const userMsg = { id: Date.now(), sender: "user", text: trimmed };
-      setMessages((m) => [...m, userMsg]);
-      setIsLoading(true);
-      setError(null);
+  // 🧹 Helper to clean Gemini's raw text (no messy symbols)
+  const cleanText = (text) => {
+    if (!text) return "Hmm... couldn't understand that 🤔";
+    return text
+      .replace(/[*#_`]/g, "") // remove markdown symbols
+      .replace(/<[^>]*>/g, "") // remove <tags>
+      .replace(/\n{2,}/g, "\n") // reduce multiple newlines
+      .replace(/\n/g, " ") // make single line
+      .trim();
+  };
 
-      try {
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: trimmed }),
-        });
+  // Send message and get Gemini response
+  const sendMessage = async (text) => {
+    if (!text.trim()) return;
 
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(errText || "Network response was not ok");
-        }
+    const userMsg = { text, sender: "user" };
+    setMessages((prev) => [...prev, userMsg]);
+    setIsLoading(true);
 
-        const data = await res.json();
-
-        // Expect backend to return a JSON like: { reply: "..." }
-        // or { reply: [{ text: "..." }, ...] }
-        let replyText = "";
-        if (typeof data.reply === "string") replyText = data.reply;
-        else if (Array.isArray(data.reply))
-          replyText = data.reply.map((r) => r.text ?? "").join("\n");
-        else replyText = data.reply?.text ?? "";
-
-        const botMsg = {
-          id: Date.now() + 1,
-          sender: "bot",
-          text: replyText || "Sorry, I couldn't generate a response.",
-        };
-        setMessages((m) => [...m, botMsg]);
-      } catch (err) {
-        setError(err?.message || "Error sending message");
-        setMessages((m) => [
-          ...m,
-          {
-            id: Date.now() + 2,
-            sender: "bot",
-            text: "Sorry, something went wrong.",
-          },
-        ]);
-      } finally {
-        setIsLoading(false);
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error(
+          "Gemini API key not found. Please set VITE_GEMINI_API_KEY in your .env file."
+        );
       }
-    },
-    [endpoint]
-  );
 
-  return { messages, sendMessage, isLoading, error, setMessages };
-}
+      // Initialize Gemini client
+      const genAI = new GoogleGenerativeAI(apiKey);
+
+      // ✅ Use free & stable model
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.0-flash", // stable and supported
+      });
+
+      // 🧠 Add contextual prompt for Menstalk AI
+      const prompt = `
+        You are Menstalk AI — an empathetic, knowledgeable, and grounded companion
+        designed to help men talk about their mental health, emotions, motivation,
+        relationships, and lifestyle in a safe, judgment-free space.
+
+        Your role:
+        - Listen first, then respond calmly and conversationally.
+        - Offer thoughtful insights, emotional understanding, and practical guidance.
+        - If the user expresses sadness, anxiety, loneliness, or anger, respond with genuine empathy
+          and give simple actions they can try right now (like journaling, breathing, or talking to someone they trust).
+        - When the topic is fitness, relationships, career, habits, or confidence,
+          give detailed, constructive advice, steps, or mindset shifts — be informative and encouraging.
+        - Mention professional help only when the user seems in crisis (never as a default line).
+        - Never sound robotic or generic. Speak like a supportive friend who reads psychology, fitness, and motivation books.
+        - Avoid medical prescriptions or diagnosis. Stay conversational, positive, and human.
+
+        Tone:
+        - Calm, supportive, slightly informal.
+        - 2–4 sentences per reply.
+        - No emojis unless the user uses one first.
+
+        
+        Now, reply to this message in deatil  as Menstalk AI:
+        "${text}"
+        `;
+
+      // Generate AI response
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let botText = response.text();
+
+      botText = cleanText(botText); // 🧽 Clean formatting
+
+      const botMsg = {
+        text: botText || "Hmm... I’m thinking 🤔. Try rephrasing that?",
+        sender: "bot",
+      };
+
+      setMessages((prev) => [...prev, botMsg]);
+    } catch (error) {
+      console.error("Gemini Error:", error);
+
+      const errorMsg = {
+        text:
+          " Oops, something went wrong while connecting to Gemini.\n" +
+          (error.message || "Please try again later."),
+        sender: "bot",
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Clear chat history
+  const clearChat = () => setMessages([]);
+
+  return { messages, sendMessage, clearChat, isLoading };
+};
