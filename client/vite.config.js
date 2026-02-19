@@ -10,5 +10,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"), // optional but handy for imports
     },
+    // Ensure case-sensitive imports for Linux deployment
+    caseSensitive: true,
   },
 });

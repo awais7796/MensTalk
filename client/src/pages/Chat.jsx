@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useChat } from "../Hooks/useChat";
-import ChatBubble from "../components/ui/ChatBubble";
-import ChatInput from "../components/ui/ChatInput";
+import { useChat } from "../Hooks/useChat.jsx";
+import ChatBubble from "../components/ui/ChatBubble.jsx";
+import ChatInput from "../components/ui/ChatInput.jsx";
 
 const Chat = () => {
   const { messages, sendMessage, isLoading } = useChat();
