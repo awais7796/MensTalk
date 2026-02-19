@@ -9,11 +9,13 @@ export const useChat = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Save messages in localStorage for persistence
+  // {Added persistence so chat history survives page refresh and gives users a continuous conversation experience}
   useEffect(() => {
     localStorage.setItem("menstalk-messages", JSON.stringify(messages));
   }, [messages]);
 
   // 🧹 Helper to clean Gemini's raw text (no messy symbols)
+  // {Introduced a sanitizer to remove markdown, HTML tags, and extra newlines from Gemini output for cleaner UI rendering}
   const cleanText = (text) => {
     if (!text) return "Hmm... couldn't understand that 🤔";
     return text
@@ -25,6 +27,7 @@ export const useChat = () => {
   };
 
   // Send message and get Gemini response
+  // {Main chat pipeline: pushes user message → calls Gemini → cleans response → updates state}
   const sendMessage = async (text) => {
     if (!text.trim()) return;
 
@@ -41,9 +44,11 @@ export const useChat = () => {
       }
 
       // Initialize Gemini client
+      // {Using official GoogleGenerativeAI SDK with env-based key for secure configuration}
       const genAI = new GoogleGenerativeAI(apiKey);
 
       // Use current model (gemini-1.5-flash retired; 2.5 is active)
+      // {Upgraded to gemini-2.5-flash for better speed, quality, and future compatibility}
       const model = genAI.getGenerativeModel({
         model: "gemini-2.5-flash",
         generationConfig: {
@@ -53,7 +58,8 @@ export const useChat = () => {
       });
 
       // 🧠 Add contextual prompt for Menstalk AI
-          const prompt = `
+      // {Engineered a strong system-style prompt to shape tone, empathy, and domain behavior of Menstalk AI}
+      const prompt = `
         You are Menstalk AI — an empathetic, knowledgeable, and grounded companion
         designed to help men talk about their mental health, emotions, motivation,
         relationships, and lifestyle in a safe, judgment-free space.
@@ -79,12 +85,12 @@ export const useChat = () => {
         "${text}"
         `;
 
-
       // Generate AI response
       const result = await model.generateContent(prompt);
       const response = result.response;
 
       // Safely extract text (response.text() throws if blocked or no candidates)
+      // {Defensive parsing added to prevent runtime crashes when Gemini returns empty/blocked candidates}
       let botText = "";
       if (response.candidates?.length > 0) {
         const parts = response.candidates[0].content?.parts;
@@ -104,10 +110,10 @@ export const useChat = () => {
       };
 
       setMessages((prev) => [...prev, botMsg]);
-    }
-     catch (error) {
+    } catch (error) {
       console.error("Gemini Error:", error);
 
+      // {User-friendly fallback so UI doesn't silently fail when API errors occur}
       const errorMsg = {
         text:
           "⚠️ Oops, something went wrong while connecting to Gemini.\n" +
@@ -121,6 +127,7 @@ export const useChat = () => {
   };
 
   // Clear chat history
+  // {Exposed utility to allow UI reset / new conversation flow}
   const clearChat = () => setMessages([]);
 
   return { messages, sendMessage, clearChat, isLoading };
