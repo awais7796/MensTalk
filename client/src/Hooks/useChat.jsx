@@ -43,13 +43,17 @@ export const useChat = () => {
       // Initialize Gemini client
       const genAI = new GoogleGenerativeAI(apiKey);
 
-      // ✅ Use free & stable model
+      // Use current model (gemini-1.5-flash retired; 2.5 is active)
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash", // stable and supported
+        model: "gemini-2.5-flash",
+        generationConfig: {
+          maxOutputTokens: 8192,
+          temperature: 0.7,
+        },
       });
 
       // 🧠 Add contextual prompt for Menstalk AI
-      const prompt = `
+          const prompt = `
         You are Menstalk AI — an empathetic, knowledgeable, and grounded companion
         designed to help men talk about their mental health, emotions, motivation,
         relationships, and lifestyle in a safe, judgment-free space.
@@ -75,12 +79,24 @@ export const useChat = () => {
         "${text}"
         `;
 
+
       // Generate AI response
       const result = await model.generateContent(prompt);
-      const response = await result.response;
-      let botText = response.text();
+      const response = result.response;
 
-      botText = cleanText(botText); // 🧽 Clean formatting
+      // Safely extract text (response.text() throws if blocked or no candidates)
+      let botText = "";
+      if (response.candidates?.length > 0) {
+        const parts = response.candidates[0].content?.parts;
+        if (parts?.length) {
+          botText = parts.map((p) => p.text || "").join("");
+        }
+      }
+      if (response.promptFeedback?.blockReason) {
+        botText = "Your message was blocked by safety filters. Try rephrasing.";
+      }
+
+      botText = cleanText(botText) || "I couldn't generate a response. Try again?";
 
       const botMsg = {
         text: botText || "Hmm... I’m thinking 🤔. Try rephrasing that?",
@@ -88,12 +104,13 @@ export const useChat = () => {
       };
 
       setMessages((prev) => [...prev, botMsg]);
-    } catch (error) {
+    }
+     catch (error) {
       console.error("Gemini Error:", error);
 
       const errorMsg = {
         text:
-          " Oops, something went wrong while connecting to Gemini.\n" +
+          "⚠️ Oops, something went wrong while connecting to Gemini.\n" +
           (error.message || "Please try again later."),
         sender: "bot",
       };
